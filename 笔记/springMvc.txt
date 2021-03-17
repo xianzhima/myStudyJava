@@ -1,0 +1,241 @@
+<!-- 组件扫描 -->
+<context:component-scan base-package="com.itheima.controller"/>
+前端控制器: servlet SpringMVC进行请求分发的核心控制器
+<servlet>
+    <servlet-name>DispatcherServlet</servlet-name>
+    <servlet-class>org.springframework.web.servlet.DispatcherServlet</servlet-class>
+
+    <init-param>    <!--name是固定的，必须是contextConfigLocation -->
+        <param-name>contextConfigLocation</param-name>
+        <param-value>classpath:spring-mvc.xml</param-value>
+    </init-param> SpringMVC配置文件的位置
+    <!--
+        指定项目启动的时候就初始化DispatcherServlet
+     -->
+    <load-on-startup>2</load-on-startup>
+</servlet>
+<servlet-mapping>
+    <servlet-name>DispatcherServlet</servlet-name>
+    <!--
+        /           表示当前servlet映射除jsp之外的所有请求（包含静态资源）
+        /*          表示当前servlet映射所有请求（包含静态资源）
+        *.do        struct1 请求默认后缀，表示当前servlet映射以.do结尾的请求
+        *.action    struct2 请求默认后缀，表示当前servlet映射以.action结尾的请求
+		*.html		伪静态，为了SEO优化
+    -->
+    <url-pattern>/</url-pattern>
+</servlet-mapping>
+
+/设置当前类为Spring的控制器类
+@Controller
+public class UserController {
+    //设定当前方法的访问映射地址
+    @RequestMapping("/save")
+    //设置当前方法返回值类型为String，用于指定请求完成后跳转的页面
+    public String save(){
+        System.out.println("user mvc controller is running ...");
+        //设定具体跳转的页面
+        return "success.jsp";
+    }
+}
+
+处理器映射器、处理器适配器、视图解析器称为`SpringMVC`的三大组件
+
+SpringMVC 和 Spring分别有自己的容器，装配属于自己控制范围的`Bean`，所以要分开扫描
+
+注解驱动
+<mvc:annotation-driven/> 这个标签对应的实现类为：org.springframework.web.servlet.config.AnnotationDrivenBeanDefinitionParser
+实现自动装配常用的`处理器适配器、处理器映射器
+
+前端控制器`DispatcherServlet会覆盖掉`Tomcat`默认的`DefaultServlet`的相关配置 需要放行
+放行
+    手动映射：指定请求URL和对应静态资源的映射路径
+        <mvc:resources mapping="/img/**" location="/img/"/>
+         mapping属性 值为请求的url
+         location属性 用于指定对应资源的路径
+    自动映射：转交`Tomcat`默认的`servlet`处理
+         <mvc:default-servlet-handler/>
+
+编码处理
+    乱码处理过滤器
+        <filter>
+            <filter-name>CharacterEncodingFilter</filter-name>
+            <filter-class>org.springframework.web.filter.CharacterEncodingFilter</filter-class>
+            <init-param>
+                <!-- name固定不变，value值根据需要设置 -->
+                <param-name>encoding</param-name>
+                <param-value>UTF-8</param-value>
+            </init-param>
+        </filter>
+        <filter-mapping>
+            <filter-name>CharacterEncodingFilter</filter-name>
+            <!-- 所有请求都设置utf-8的编码 -->
+            <url-pattern>/*</url-pattern>
+        </filter-mapping>
+       maven-tomcat7插件可以配置`<uriEncoding>`为`UTF-8`解决请求乱码问题
+    消息转换器
+        <mvc:annotation-driven >
+            <mvc:message-converters>
+                <bean class="org.springframework.http.converter.StringHttpMessageConverter">
+                    <constructor-arg value="utf-8"/>
+                </bean>
+            </mvc:message-converters>
+        </mvc:annotation-driven>
+
+请求参数自动封装
+
+//http://localhost/requestParam1?name=itheima&age=14
+@RequestMapping("/requestParam1")
+//public String requestParam1(String name,int age){
+public String requestParam1(User user){
+//user相关的成员表变量名称需要是name、age
+
+/方法传递普通类型参数，数量任意，类型必须匹配
+    //http://localhost/requestParam1?name=itheima
+//http://localhost/requestParam1?name=itheima&age=14
+    @RequestMapping("/requestParam1")
+    public String requestParam1(String name, int age) {
+
+使用@RequestParam参数匹配URL传参中的参数名称与方法形参名称
+//http://localhost/requestParam2?userName=Jock
+    @RequestMapping("/requestParam2")
+    public String requestParam2(@RequestParam(name = "userName", required = true, defaultValue="itheima") String name) {
+
+//使用对象属性名.属性名的对象层次结构可以为POJO中的POJO类型参数属性赋值
+    //http://localhost/requestParam5?address.city=beijing
+    @RequestMapping("/requestParam5")
+    public String requestParam5(User user) {
+        System.out.println(user.getAddress().getCity());
+
+//通过URL地址中同名参数，可以为POJO中的集合属性进行赋值，集合属性要求保存简单数据
+    //http://localhost/requestParam6?nick=Jock1&nick=Jockme&nick=zahc
+    @RequestMapping("/requestParam6")
+    public String requestParam6(User user) {
+
+    //POJO中List对象保存POJO的对象属性赋值，使用[数字]的格式指定为集合中第几个对象的属性赋值
+    //http://localhost/requestParam7?addresses[0].city=beijing&addresses[1].province=hebei
+    @RequestMapping("/requestParam7")
+    public String requestParam7(User user) {
+        System.out.println(user.getAddresses());
+
+//POJO中Map对象保存POJO的对象属性赋值，使用[key]的格式指定为Map中的对象属性赋值
+    //http://localhost/requestParam8?addressMap['job'].city=beijing&addressMap['home'].province=henan
+    @RequestMapping("/requestParam8")
+    public String requestParam8(User user) {
+        System.out.println(user.getAddressMap());
+
+//方法传递普通类型的数组参数，URL地址中使用同名变量为数组赋值
+    //http://localhost/requestParam9?nick=Jockme&nick=zahc
+    @RequestMapping("/requestParam9")
+    public String requestParam9(String[] nick) {
+        System.out.println(nick[0] + "," + nick[1]);
+
+//方法传递保存普通类型的List集合时，无法直接为其赋值，需要使用@RequestParam参数对参数名称进行转换
+    //http://localhost/requestParam10?nick=Jockme&nick=zahc
+    @RequestMapping("/requestParam10")
+    public String requestParam10(@RequestParam("nick") List<String> nick) {
+        System.out.println(nick);
+
+//数据类型转换，使用自定义格式化器或@DateTimeFormat注解设定日期格式
+    //两种方式都依赖springmvc的注解启动才能运行
+    //http://localhost/requestParam11?date=1999-09-09
+    @RequestMapping("/requestParam11")
+    public String requestParam11(@DateTimeFormat(pattern = "yyyy-MM-dd") Date date) {
+
+ //带有类映射地址访问格式，需要将类映射地址作为前缀添加在实际映射地址的前面
+    //最终返回的页面如果未设定绝对访问路径，将从类映射地址所在目录中查找
+     @RequestMapping("/user")
+    class hhh{
+    //http://localhost/user/requestURL2     （注意：要配合类上定义的路径使用）
+    @RequestMapping("/requestURL2")
+    public String requestURL2() {
+    }
+
+    @RequestMapping(
+    value="/requestURL3",            // 设定请求路径，与 path 属性、 value 属性相同
+    method = RequestMethod.GET,      // 设定请求方式
+    params = "name",                 // 设定请求参数条件
+    headers = "content-type=text/*", // 设定请求消息头条件
+    consumes = "text/*",         // 用于指定可以接收的请求正文类型（ MIME 类型）
+    produces = "text/*"          // 用于指定可以生成的响应正文类型（ MIME 类型）
+    )
+
+
+带数据页面跳转
+    直接在`Handler`方法上添加`Model`、`Map`、`ModelMap`、`ModelAndView`类型的形参，`SpringMVC`会自动创建对应类型的对象；
+    通过为上述对象设置数据后，在跳转的页面上就可以获取到对应的数据，**其本质和`Handler`形参位置添加`request`对象一样**。
+    除`ModelAndView` 外，所有类型的底层实现类 都是`org.springframework.validation.support.BindingAwareModelMap`类型
+    `ModelAndView` 除了可以设置数据外，还可以设置视图，直接return该类型对象就可以实现带数据页面跳转。
+
+//使用Model形参传递参数
+    @RequestMapping("/showPageAndData2")
+    public String showPageAndData2(Model model) {
+        System.out.println("model.getClass() = " + model.getClass());
+        //添加数据的方式，key对value
+        model.addAttribute("name","Jock");
+        Book book  = new Book();
+        book.setName("SpringMVC入门案例");
+        book.setPrice(66.66d);
+        //添加数据的方式，key对value
+        model.addAttribute("book",book);
+        return "page";
+
+   //使用ModelAndView形参传递参数，该对象还封装了页面信息
+    @RequestMapping("/showPageAndData3")
+    public ModelAndView showPageAndData3(ModelAndView modelAndView) {
+        //ModelAndView mav = new ModelAndView();    替换形参中的参数
+        System.out.println("modelAndView.getClass() = " + modelAndView.getClass());
+        Book book  = new Book();
+        book.setName("SpringMVC入门案例");
+        book.setPrice(66.66d);
+
+        //添加数据的方式，key对value
+        modelAndView.addObject("book",book);
+        //添加数据的方式，key对value
+        modelAndView.addObject("name","Jockme");
+        //设置页面的方式，该方法最后一次执行的结果生效
+        modelAndView.setViewName("page");
+        //返回值设定成ModelAndView对象
+        return modelAndView;
+    }
+/ModelAndView对象支持转发的手工设定，该设定不会启用前缀后缀的页面拼接格式
+modelAndView.setViewName("forward:/WEB-INF/page/page.jsp");
+
+//使用Map形参传递参数
+    @RequestMapping("/showPageAndData6")
+    public String showPageAndData6(Map map) {
+
+    map.put("book",book);
+        return "page";
+    }
+    //使用modelMap形参传递参数
+        @RequestMapping("/showPageAndData7")
+        public String showPageAndData7(ModelMap modelMap) {
+         modelMap.addAttribute("book",book);
+                return "page";
+            }
+        }
+
+        JackSon`依赖坐标
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>2.9.0</version>
+        </dependency>
+开启注解驱动
+        <mvc:annotation-driven>
+
+     配置视图解析器
+        <bean class="org.springframework.web.servlet.view.InternalResourceViewResolver">
+            <property name="prefix" value="/WEB-INF/page/"/>
+            <property name="suffix" value=".jsp"/>
+        </bean>
+
+### @EnableWebMvc
+
+相当于`xml`文件中配置的`<mvc:annotation-driven>`
+
+
+
+
+
